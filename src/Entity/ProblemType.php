@@ -4,6 +4,8 @@ namespace App\Entity;
 
 use App\Repository\ProblemTypeRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 
 #[ORM\Entity(repositoryClass: ProblemTypeRepository::class)]
 class ProblemType
@@ -19,6 +21,14 @@ class ProblemType
     #[ORM\ManyToOne(inversedBy: 'problemTypes')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Category $category = null;
+
+    #[ORM\OneToMany(mappedBy: 'problemType', targetEntity: DiagnosticSteps::class)]
+    private Collection $diagnosticSteps;
+
+    public function __construct()
+    {
+        $this->diagnosticSteps = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -44,6 +54,33 @@ class ProblemType
     public function setCategory(?Category $category): static
     {
         $this->category = $category;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, DiagnosticSteps>
+     */
+    public function getDiagnosticSteps(): Collection
+    {
+        return $this->diagnosticSteps;
+    }
+
+    public function addDiagnosticStep(DiagnosticSteps $diagnosticStep): static
+    {
+        if (!$this->diagnosticSteps->contains($diagnosticStep)) {
+            $this->diagnosticSteps->add($diagnosticStep);
+            $diagnosticStep->setProblemType($this);
+        }
+        return $this;
+    }
+
+    public function removeDiagnosticStep(DiagnosticSteps $diagnosticStep): static
+    {
+        if ($this->diagnosticSteps->removeElement($diagnosticStep)) {
+            if ($diagnosticStep->getProblemType() === $this) {
+                $diagnosticStep->setProblemType(null);
+            }
+        }
         return $this;
     }
 } 

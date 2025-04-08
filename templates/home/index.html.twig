@@ -58,6 +58,16 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .problem-box:hover {
+            background-color: #7CCD7C;
+            transform: scale(1.02);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
     </style>
 {% endblock %}
@@ -79,9 +89,9 @@
                         {{ category.name }}
                     </div>
                     {% for problemType in category.problemTypes %}
-                        <div class="problem-box">
+                        <a href="{{ path('app_diagnostic', {'id': problemType.id}) }}" class="problem-box">
                             {{ problemType.name }}
-                        </div>
+                        </a>
                     {% endfor %}
                 </div>
             {% endfor %}

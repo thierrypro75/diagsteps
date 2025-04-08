@@ -1,0 +1,134 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Diagnostic - {{ problemType.name }}{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ problemType.name }}</h1>
+    
+    <div class="diagnostic-steps">
+        {# Section Symptômes #}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#symptomes">
+                <h2 class="h5 mb-0">Symptômes</h2>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="collapse show" id="symptomes">
+                <div class="card-body">
+                    {% for step in steps.symptome %}
+                        <div class="step-item mb-3">
+                            <div class="step-content">
+                                <h3 class="h6">{{ step.description }}</h3>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {# Section Vérifications #}
+        <div class="card mb-4">
+            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#verifications">
+                <h2 class="h5 mb-0">Vérifications</h2>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="collapse" id="verifications">
+                <div class="card-body">
+                    {% for step in steps.check %}
+                        <div class="step-item mb-3">
+                            <div class="step-content">
+                                <h3 class="h6">{{ step.description }}</h3>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="check_{{ step.id }}">
+                                    <label class="form-check-label" for="check_{{ step.id }}">
+                                        Vérifié
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {# Section Actions #}
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#actions">
+                <h2 class="h5 mb-0">Actions</h2>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="collapse" id="actions">
+                <div class="card-body">
+                    {% for step in steps.action %}
+                        <div class="step-item mb-3">
+                            <div class="step-content">
+                                <h3 class="h6">{{ step.description }}</h3>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="action_{{ step.id }}">
+                                    <label class="form-check-label" for="action_{{ step.id }}">
+                                        Effectué
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block javascripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestion des étapes suivantes
+    const checkboxes = document.querySelectorAll('.form-check-input');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                // Trouver la prochaine étape
+                const currentStep = this.closest('.step-item');
+                const nextStep = currentStep.nextElementSibling;
+                if (nextStep) {
+                    // Dérouler la section si nécessaire
+                    const section = nextStep.closest('.collapse');
+                    if (section && !section.classList.contains('show')) {
+                        const bsCollapse = new bootstrap.Collapse(section);
+                        bsCollapse.show();
+                    }
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
+
+{% block stylesheets %}
+<style>
+.step-item {
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #f8f9fa;
+}
+
+.step-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header {
+    cursor: pointer;
+}
+
+.card-header i {
+    transition: transform 0.3s;
+}
+
+.card-header[aria-expanded="true"] i {
+    transform: rotate(180deg);
+}
+</style>
+{% endblock %}
+{% endblock %} 
