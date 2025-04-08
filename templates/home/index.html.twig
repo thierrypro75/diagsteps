@@ -1,59 +1,90 @@
-{% extends 'layouts/base.html.twig' %}
+{% extends 'base.html.twig' %}
 
-{% block title %}{{ title }}{% endblock %}
+{% block title %}Arbre de décision{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .title-box {
+            border: 2px solid black;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .instruction-box {
+            background-color: #ffcba4;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            position: relative;
+            clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+        }
+
+        .categories-container {
+            display: flex;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 20px;
+        }
+
+        .category-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .category-title {
+            border: 2px solid black;
+            padding: 10px;
+            text-align: center;
+            background-color: white;
+            font-weight: bold;
+        }
+
+        .problem-box {
+            background-color: #90EE90;
+            padding: 15px;
+            text-align: center;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+{% endblock %}
 
 {% block body %}
-<div class="row">
-    <div class="col-md-12 text-center mb-5">
-        <h1 class="display-4">{{ title }}</h1>
-        <p class="lead">{{ description }}</p>
-    </div>
-</div>
+    <div class="container mt-5">
+        <div class="title-box">
+            <h1>DANS QUEL CAS ETES-VOUS ?</h1>
+        </div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Décision Simple</h5>
-                <p class="card-text">Prenez des décisions basées sur des critères simples et directs.</p>
-                <a href="#" class="btn btn-primary">Commencer</a>
-            </div>
+        <div class="instruction-box">
+            SI PLUSIEURS PROBLEMES PRENDRE LE PROBLEME LE PLUS A GAUCHE
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Décision Complexe</h5>
-                <p class="card-text">Analysez des situations complexes avec des critères multiples.</p>
-                <a href="#" class="btn btn-primary">Commencer</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Historique</h5>
-                <p class="card-text">Consultez vos décisions précédentes et leurs résultats.</p>
-                <a href="#" class="btn btn-primary">Voir l'historique</a>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="row mt-5">
-    <div class="col-md-8 offset-md-2">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Comment ça marche ?</h5>
-                <p class="card-text">Notre outil vous guide à travers un processus de décision structuré :</p>
-                <ol>
-                    <li>Définissez votre question ou problème</li>
-                    <li>Identifiez les critères importants</li>
-                    <li>Évaluez les options disponibles</li>
-                    <li>Obtenez une recommandation basée sur vos critères</li>
-                </ol>
-            </div>
+        <div class="categories-container">
+            {% for category in categories %}
+                <div class="category-column">
+                    <div class="category-title">
+                        {{ category.name }}
+                    </div>
+                    {% for problemType in category.problemTypes %}
+                        <div class="problem-box">
+                            {{ problemType.name }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
         </div>
     </div>
-</div>
 {% endblock %}
