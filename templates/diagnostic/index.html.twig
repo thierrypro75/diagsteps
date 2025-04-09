@@ -54,9 +54,35 @@
         
         <div class="col-md-8">
             <h2 class="mb-3">Arbre de diagnostic</h2>
-            <div id="diagnosticTree" class="diagnostic-tree">
-                <div class="alert alert-info initial-message">
-                    Cliquez sur un symptôme pour afficher son arbre de diagnostic.
+            
+            <!-- Onglets -->
+            <ul class="nav nav-tabs mb-3" id="diagnosticTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tree-tab" data-bs-toggle="tab" data-bs-target="#tree-content" type="button" role="tab" aria-controls="tree-content" aria-selected="true">Vue arborescente</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="interactive-tab" data-bs-toggle="tab" data-bs-target="#interactive-content" type="button" role="tab" aria-controls="interactive-content" aria-selected="false">Interface interactive</button>
+                </li>
+            </ul>
+            
+            <!-- Contenu des onglets -->
+            <div class="tab-content" id="diagnosticTabsContent">
+                <!-- Onglet Vue arborescente -->
+                <div class="tab-pane fade show active" id="tree-content" role="tabpanel" aria-labelledby="tree-tab">
+                    <div id="diagnosticTree" class="diagnostic-tree">
+                        <div class="alert alert-info initial-message">
+                            Cliquez sur un symptôme pour afficher son arbre de diagnostic.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Onglet Interface interactive -->
+                <div class="tab-pane fade" id="interactive-content" role="tabpanel" aria-labelledby="interactive-tab">
+                    <div id="interactiveDiagnostic" class="interactive-diagnostic">
+                        <div class="alert alert-info initial-message">
+                            Cliquez sur un symptôme pour démarrer le diagnostic interactif.
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -66,7 +92,7 @@
 
 {% block javascripts %}
 {{ parent() }}
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Initialiser Mermaid (peut rester si d'autres diagrammes sont utilisés)
@@ -134,6 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Si c'est un symptôme, on affiche l'arbre (le hasNext/hasNextKo n'est plus nécessaire ici pour déclencher)
             if (stepType === 'symptome') { 
                 showDiagnosticTree(stepId); 
+                showInteractiveDiagnostic(stepId);
                 stepBlocks.forEach(b => b.classList.remove('active-step'));
                 this.classList.add('active-step');
             } else {
@@ -157,7 +184,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-
+    // Variables pour stocker l'historique du diagnostic
+    let diagnosticHistory = [];
+    let currentStepId = null;
+    
     // Fonction pour afficher l'arbre de diagnostic (simplifiée)
     function showDiagnosticTree(stepId) {
         const treeContainer = document.getElementById('diagnosticTree');
@@ -199,11 +229,286 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
             });
     }
+    
+    // Fonction pour afficher l'interface interactive
+    function showInteractiveDiagnostic(stepId) {
+        const interactiveContainer = document.getElementById('interactiveDiagnostic');
+        // Afficher un indicateur de chargement
+        interactiveContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
 
-    // Supprimer les fonctions de génération JS devenues inutiles
-    // function collectTreeData(...) { ... }
-    // function generateMermaidFromCollectedDataRevised(...) { ... }
+        // Réinitialiser l'historique si c'est un nouveau diagnostic
+        if (currentStepId !== stepId) {
+            diagnosticHistory = [];
+            currentStepId = stepId;
+        }
 
+        // Récupérer les données JSON via AJAX
+        fetch(`{{ path('app_diagnostic_json') }}?stepId=${stepId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                if (data.tree) {
+                    // Vider le conteneur
+                    interactiveContainer.innerHTML = '';
+                    // Créer l'interface interactive
+                    createInteractiveInterface(data.tree, interactiveContainer);
+                } else {
+                    interactiveContainer.innerHTML = '<div class="alert alert-warning">Aucune donnée de diagnostic à afficher pour cette étape.</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors de la récupération des données JSON:', error);
+                interactiveContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        Impossible de charger les données de diagnostic. (${error.message})
+                    </div>
+                `;
+            });
+    }
+    
+    // Fonction pour créer l'interface interactive
+    function createInteractiveInterface(treeData, container) {
+        // Créer le conteneur principal
+        const mainContainer = document.createElement('div');
+        mainContainer.className = 'interactive-container';
+        
+        // Ajouter l'historique du chemin parcouru
+        const historyContainer = document.createElement('div');
+        historyContainer.className = 'diagnostic-history mb-4';
+        
+        // Titre de l'historique
+        const historyTitle = document.createElement('h4');
+        historyTitle.className = 'h6 mb-2';
+        historyTitle.textContent = 'Chemin parcouru:';
+        historyContainer.appendChild(historyTitle);
+        
+        // Liste des étapes parcourues (transformée en breadcrumb)
+        const historyList = document.createElement('nav'); // Utiliser <nav> pour la sémantique
+        historyList.setAttribute('aria-label', 'breadcrumb');
+        historyList.className = 'breadcrumb-container'; // Nouvelle classe pour le style
+        
+        // Ajouter l'étape actuelle à l'historique si elle n'y est pas déjà
+        if (diagnosticHistory.length === 0 || diagnosticHistory[diagnosticHistory.length - 1].id !== treeData.id) {
+            diagnosticHistory.push({
+                id: treeData.id,
+                description: treeData.description,
+                type: treeData.type // Garder le type pour la couleur potentielle si besoin
+            });
+        }
+        
+        // Afficher l'historique sous forme de breadcrumb
+        diagnosticHistory.forEach((step, index) => {
+            // Créer l'élément du breadcrumb
+            const breadcrumbItem = document.createElement('span');
+            breadcrumbItem.className = 'breadcrumb-item';
+            
+            // Si ce n'est pas la dernière étape, créer un lien
+            if (index < diagnosticHistory.length - 1) {
+                const breadcrumbLink = document.createElement('a');
+                breadcrumbLink.href = '#';
+                breadcrumbLink.textContent = step.description;
+                breadcrumbLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // Supprimer les étapes après celle-ci
+                    diagnosticHistory = diagnosticHistory.slice(0, index + 1);
+                    // Afficher cette étape
+                    showInteractiveDiagnostic(step.id);
+                });
+                breadcrumbItem.appendChild(breadcrumbLink);
+            } else {
+                // Pour la dernière étape, afficher simplement le texte (étape active)
+                breadcrumbItem.textContent = step.description;
+                breadcrumbItem.classList.add('active'); // Marquer comme actif
+            }
+            
+            // Ajouter l'élément au conteneur du breadcrumb
+            historyList.appendChild(breadcrumbItem);
+        });
+        
+        // Ajouter le breadcrumb à l'historique
+        historyContainer.appendChild(historyList);
+        
+        // Ajouter l'historique au conteneur principal
+        mainContainer.appendChild(historyContainer);
+        
+        // Créer l'élément pour afficher l'étape actuelle
+        const currentStepElement = document.createElement('div');
+        currentStepElement.className = 'current-step mb-4 p-4 rounded';
+        currentStepElement.style.backgroundColor = getTypeColor(treeData.type);
+        currentStepElement.style.color = 'white';
+        
+        // Ajouter la description
+        const descriptionElement = document.createElement('h3');
+        descriptionElement.className = 'h5 mb-3';
+        descriptionElement.textContent = treeData.description;
+        currentStepElement.appendChild(descriptionElement);
+        
+        // Ajouter le type
+        const typeElement = document.createElement('span');
+        typeElement.className = 'badge bg-light text-dark';
+        typeElement.textContent = treeData.type.charAt(0).toUpperCase() + treeData.type.slice(1);
+        currentStepElement.appendChild(typeElement);
+        
+        // Ajouter l'élément d'étape actuelle au conteneur principal
+        mainContainer.appendChild(currentStepElement);
+        
+        // Créer les boutons de navigation
+        const buttonsContainer = document.createElement('div');
+        buttonsContainer.className = 'd-flex justify-content-between mt-4';
+        
+        // Ajouter les boutons au conteneur principal
+        mainContainer.appendChild(buttonsContainer);
+        
+        // Créer le conteneur pour les étapes suivantes
+        const nextStepsContainer = document.createElement('div');
+        nextStepsContainer.className = 'next-steps mt-4';
+        
+        // Titre pour les étapes suivantes
+        const nextStepsTitle = document.createElement('h4');
+        nextStepsTitle.className = 'h6 mb-3';
+        nextStepsTitle.textContent = 'Étapes suivantes:';
+        nextStepsContainer.appendChild(nextStepsTitle);
+        
+        // Conteneur pour les cartes des étapes suivantes
+        const nextStepsCards = document.createElement('div');
+        nextStepsCards.className = 'row';
+        
+        // Ajouter l'étape OK si elle existe
+        if (treeData.nextStep) {
+            // si c'est de type action, colorer en orange et si c'est de type check, colorer en jaune
+            let colorClass = 'success'; // Default to success
+            if (treeData.nextStep.type === 'action') {
+                colorClass = 'orange';
+            } else if (treeData.nextStep.type === 'check') {
+                colorClass = 'yellow';
+            }
+
+            let okCard = createNextStepCard(treeData.nextStep, 'OK', colorClass); // Utiliser la variable colorClass ici
+            nextStepsCards.appendChild(okCard);
+        }
+        
+        // Ajouter l'étape KO si elle existe
+        if (treeData.nextStepKo) {
+            // si c'est de type action, colorer en orange et si c'est de type check, colorer en jaune
+            let colorClass = 'danger'; // Default to danger
+            if (treeData.nextStep.type === 'action') {
+                colorClass = 'orange';
+            } else if (treeData.nextStep.type === 'check') {
+                colorClass = 'yellow';
+            }
+            let koCard = createNextStepCard(treeData.nextStepKo, 'KO', colorClass);
+            nextStepsCards.appendChild(koCard);
+        }
+        
+        // Si aucune étape suivante n'existe, afficher un message
+        if (!treeData.nextStep && !treeData.nextStepKo) {
+            const noNextStepsMessage = document.createElement('div');
+            noNextStepsMessage.className = 'alert alert-info';
+            noNextStepsMessage.textContent = 'Aucune étape suivante. Vous avez atteint la fin du diagnostic.';
+            nextStepsContainer.appendChild(noNextStepsMessage);
+        } else {
+            // Ajouter les cartes au conteneur des étapes suivantes
+            nextStepsContainer.appendChild(nextStepsCards);
+        }
+        
+        // Ajouter le conteneur des étapes suivantes au conteneur principal
+        mainContainer.appendChild(nextStepsContainer);
+        
+        // Ajouter le conteneur principal au conteneur parent
+        container.appendChild(mainContainer);
+    }
+    
+    // Fonction pour créer une carte d'étape suivante
+    function createNextStepCard(stepData, label, colorClass) {
+        const cardCol = document.createElement('div');
+        cardCol.className = 'col-md-6 mb-3';
+        
+        const card = document.createElement('div');
+        card.className = `card h-100 border-${colorClass}`;
+        card.style.cursor = 'pointer';
+        card.style.transition = 'all 0.3s ease';
+        
+        // Effet de survol
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+            this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = 'none';
+        });
+        
+        // En-tête de la carte
+        const cardHeader = document.createElement('div');
+        cardHeader.className = `card-header bg-${colorClass} text-white d-flex justify-content-between align-items-center`;
+        
+        const headerTitle = document.createElement('h5');
+        headerTitle.className = 'card-title mb-0';
+        headerTitle.textContent = label;
+        
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'badge bg-light text-dark';
+        typeBadge.textContent = stepData.type.charAt(0).toUpperCase() + stepData.type.slice(1);
+        
+        cardHeader.appendChild(headerTitle);
+        cardHeader.appendChild(typeBadge);
+        
+        // Corps de la carte
+        const cardBody = document.createElement('div');
+        cardBody.className = 'card-body';
+        
+        const cardText = document.createElement('p');
+        cardText.className = 'card-text';
+        cardText.textContent = stepData.description;
+        
+        cardBody.appendChild(cardText);
+        
+        // Ajouter les éléments à la carte
+        card.appendChild(cardHeader);
+        card.appendChild(cardBody);
+        
+        // Ajouter l'événement de clic
+        card.addEventListener('click', function() {
+            // Récupérer les données de l'étape suivante
+            fetch(`{{ path('app_diagnostic_json') }}?stepId=${stepData.id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.tree) {
+                        // Mettre à jour l'interface avec les nouvelles données
+                        const container = document.getElementById('interactiveDiagnostic');
+                        container.innerHTML = '';
+                        createInteractiveInterface(data.tree, container);
+                    }
+                });
+        });
+        
+        // Ajouter la carte à la colonne
+        cardCol.appendChild(card);
+        
+        return cardCol;
+    }
+    
+    // Fonction pour obtenir la couleur en fonction du type
+    function getTypeColor(type) {
+        switch (type) {
+            case 'symptome':
+                return '#4e73df';
+            case 'check':
+                return '#f6c23e';
+            case 'action':
+                return '#1cc88a';
+            default:
+                return '#6c757d';
+        }
+    }
 });
 </script>
 {% endblock %}
@@ -244,6 +549,65 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .form-check-input:checked + .form-check-label {
     text-decoration: line-through;
+    color: #6c757d;
+}
+
+/* Styles pour l'interface interactive */
+.interactive-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.current-step {
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.btn {
+    min-width: 100px;
+    margin: 0 10px;
+}
+
+/* Styles pour l'historique */
+.diagnostic-history {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+/* Styles pour le breadcrumb */
+.breadcrumb-container {
+    display: flex;
+    flex-wrap: wrap; /* Permettre le retour à la ligne si nécessaire */
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.breadcrumb-item {
+    display: inline-flex; /* Aligner le lien et le séparateur */
+    align-items: center;
+    margin-right: 0.5rem; /* Espace entre les éléments */
+    font-size: 0.9rem;
+}
+
+.breadcrumb-item a {
+    color: #4e73df;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb-item.active {
+    color: #6c757d; /* Couleur pour l'étape actuelle */
+}
+
+.breadcrumb-item+.breadcrumb-item::before {
+    content: ">";
+    margin-right: 0.5rem;
     color: #6c757d;
 }
 
@@ -346,6 +710,24 @@ document.addEventListener('DOMContentLoaded', function() {
     .container-fluid {
         padding: 0 15px;
     }
+}
+
+/* Ajout des couleurs personnalisées pour les cartes */
+.border-orange {
+    border-color: #fd7e14 !important; /* Bootstrap orange */
+}
+
+.bg-orange {
+    background-color: #fd7e14 !important; /* Bootstrap orange */
+}
+
+.border-yellow {
+    border-color:rgb(255, 217, 103) !important; /* Bootstrap yellow */
+}
+
+.bg-yellow {
+    background-color:rgb(255, 217, 103) !important; /* Bootstrap yellow */
+    color: #212529 !important; /* Texte foncé pour contraste sur fond jaune */
 }
 </style>
 {% endblock %} 

@@ -51,6 +51,27 @@ class DiagnosticController extends AbstractController
 
         return new JsonResponse(['mermaidCode' => $mermaidCode]);
     }
+    
+    #[Route('/diagnostic/json', name: 'app_diagnostic_json', methods: ['GET'])]
+    public function getDiagnosticJson(Request $request, DiagnosticStepsRepository $diagnosticStepsRepository): JsonResponse
+    {
+        $stepId = $request->query->get('stepId');
+
+        if (!$stepId) {
+            return new JsonResponse(['error' => 'Missing stepId parameter'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $startStep = $diagnosticStepsRepository->find($stepId);
+
+        if (!$startStep) {
+            return new JsonResponse(['error' => 'Diagnostic step not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Utiliser la méthode du repository pour construire l'arbre au format JSON
+        $treeData = $diagnosticStepsRepository->buildDiagnosticTreeJson($startStep);
+
+        return new JsonResponse(['tree' => $treeData]);
+    }
 
     #[Route('/diagnostic/{id}', name: 'app_diagnostic_index')]
     public function index(ProblemType $problemType, DiagnosticStepsRepository $diagnosticStepsRepository): Response
@@ -62,38 +83,5 @@ class DiagnosticController extends AbstractController
             'problemType' => $problemType,
             // 'diagnosticSteps' => $diagnosticSteps, // Pass only problemType
         ]);
-    }
-    
-    /**
-     * Construit un arbre de diagnostic à partir d'une étape
-     */
-    private function buildDiagnosticTree(DiagnosticSteps $step): array
-    {
-        $tree = [
-            'id' => $step->getId(),
-            'description' => $step->getDescription(),
-            'type' => $step->getType(),
-            'needDoc' => $step->isNeedDoc(),
-            'children' => [],
-            'nextStep' => null,
-            'nextStepKo' => null
-        ];
-        
-        // Ajouter les enfants
-        foreach ($step->getChildren() as $child) {
-            $tree['children'][] = $this->buildDiagnosticTree($child);
-        }
-        
-        // Ajouter nextStep s'il existe
-        if ($step->getNextStep()) {
-            $tree['nextStep'] = $this->buildDiagnosticTree($step->getNextStep());
-        }
-        
-        // Ajouter nextStepKo s'il existe
-        if ($step->getNextStepKo()) {
-            $tree['nextStepKo'] = $this->buildDiagnosticTree($step->getNextStepKo());
-        }
-        
-        return $tree;
     }
 } 

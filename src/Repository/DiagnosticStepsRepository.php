@@ -168,4 +168,40 @@ class DiagnosticStepsRepository extends ServiceEntityRepository
         $processChild($node->getNextStep(), 'OK');
         $processChild($node->getNextStepKo(), 'KO');
     }
+    
+    /**
+     * Construit un arbre de diagnostic au format JSON à partir d'une étape
+     * 
+     * @param DiagnosticSteps $step L'étape de diagnostic à partir de laquelle construire l'arbre
+     * @return array L'arbre de diagnostic au format JSON
+     */
+    public function buildDiagnosticTreeJson(DiagnosticSteps $step): array
+    {
+        $tree = [
+            'id' => $step->getId(),
+            'description' => $step->getDescription(),
+            'type' => $step->getType(),
+            'needDoc' => $step->isNeedDoc(),
+            'children' => [],
+            'nextStep' => null,
+            'nextStepKo' => null
+        ];
+        
+        // Ajouter les enfants
+        foreach ($step->getChildren() as $child) {
+            $tree['children'][] = $this->buildDiagnosticTreeJson($child);
+        }
+        
+        // Ajouter nextStep s'il existe
+        if ($step->getNextStep()) {
+            $tree['nextStep'] = $this->buildDiagnosticTreeJson($step->getNextStep());
+        }
+        
+        // Ajouter nextStepKo s'il existe
+        if ($step->getNextStepKo()) {
+            $tree['nextStepKo'] = $this->buildDiagnosticTreeJson($step->getNextStepKo());
+        }
+        
+        return $tree;
+    }
 } 
