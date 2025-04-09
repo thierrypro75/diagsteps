@@ -87,15 +87,17 @@ class DiagnosticStepsRepository extends ServiceEntityRepository
 
         foreach ($collectedNodes as $nodeData) {
             $mermaidNodeId = 'node' . $nodeData['id'];
-            // Use json_encode for robust escaping of description within quotes
-            // JSON_HEX_QUOT | JSON_HEX_APOS | JSON_HEX_AMP are important for security if displaying in HTML
-            $nodeLabel = json_encode($nodeData['description'] ?? '', JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT | JSON_HEX_APOS | JSON_HEX_AMP);
-            // Remove surrounding quotes added by json_encode as Mermaid adds its own delimiters
-            $nodeLabel = trim($nodeLabel, '"'); 
             
-            $nodeShape = '["' . $nodeLabel . '"]';
+            // Récupérer et préparer la description
+            $description = $nodeData['description'] ?? '';
+            // Ajouter des retours à la ligne (ex: tous les 30 caractères), sans couper les mots
+            $wrappedDescription = wordwrap($description, 30, "\n", false);
+            // Échapper les guillemets pour Mermaid après le wordwrap
+            $escapedDescription = str_replace('"', '#quot;', $wrappedDescription);
+            
+            $nodeShape = '["' . $escapedDescription . '"]';
             if ($nodeData['type'] === 'check') {
-                $nodeShape = '{"' . $nodeLabel . '"}';
+                $nodeShape = '{"' . $escapedDescription . '"}';
             }
 
             $nodeDefinitions[] = $mermaidNodeId . $nodeShape;
@@ -113,9 +115,9 @@ class DiagnosticStepsRepository extends ServiceEntityRepository
         }
 
         $classDefs = [
-            'classDef symptome fill:#4e73df,stroke:#3b5bdb,color:#fff',
-            'classDef check fill:#f6c23e,stroke:#dda20a,color:#333',
-            'classDef action fill:#1cc88a,stroke:#13a16e,color:#fff'
+            'classDef symptome fill:#90EE90,stroke:#7BC87B,color:#333',
+            'classDef check fill:#ffffaa,stroke:#dda20a,color:#333',
+            'classDef action fill:#FFA500,stroke:#CC8400,color:#333'
         ];
 
         $mermaidCode = "flowchart TD\n"
