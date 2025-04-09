@@ -43,6 +43,16 @@ class DiagnosticSteps
     #[ORM\JoinColumn(nullable: false)]
     private ?ProblemType $problemType = null;
 
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $goto = null;
+
+    #[ORM\ManyToOne(targetEntity: self::class)]
+    #[ORM\JoinColumn(name: 'next_step_ko_id', referencedColumnName: 'id', nullable: true)]
+    private ?self $nextStepKo = null;
+
+    #[ORM\Column(type: 'boolean')]
+    private bool $needDoc = false;
+
     public function __construct()
     {
         $this->children = new \Doctrine\Common\Collections\ArrayCollection();
@@ -143,6 +153,39 @@ class DiagnosticSteps
     public function setProblemType(?ProblemType $problemType): self
     {
         $this->problemType = $problemType;
+        return $this;
+    }
+
+    public function getGoto(): ?int
+    {
+        return $this->goto;
+    }
+
+    public function setGoto(?int $goto): self
+    {
+        $this->goto = $goto;
+        return $this;
+    }
+
+    public function getNextStepKo(): ?self
+    {
+        return $this->nextStepKo;
+    }
+
+    public function setNextStepKo(?self $nextStepKo): self
+    {
+        $this->nextStepKo = $nextStepKo;
+        return $this;
+    }
+
+    public function isNeedDoc(): bool
+    {
+        return $this->needDoc;
+    }
+
+    public function setNeedDoc(bool $needDoc): self
+    {
+        $this->needDoc = $needDoc;
         return $this;
     }
 } 

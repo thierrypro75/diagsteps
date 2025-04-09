@@ -3,132 +3,349 @@
 {% block title %}Diagnostic - {{ problemType.name }}{% endblock %}
 
 {% block body %}
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <h1 class="mb-4">{{ problemType.name }}</h1>
     
-    <div class="diagnostic-steps">
-        {# Section Symptômes #}
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#symptomes">
-                <h2 class="h5 mb-0">Symptômes</h2>
-                <i class="fas fa-chevron-down"></i>
-            </div>
-            <div class="collapse show" id="symptomes">
-                <div class="card-body">
-                    {% for step in steps.symptome %}
-                        <div class="step-item mb-3">
-                            <div class="step-content">
-                                <h3 class="h6">{{ step.description }}</h3>
+    <div class="row">
+        <div class="col-md-4">
+            <h2 class="mb-3">Étapes de diagnostic</h2>
+            <div class="diagnostic-steps">
+                {% for diagnosticStep in problemType.diagnosticSteps|filter(step => step.parent is null) %}
+                    <div class="step-block mb-4" 
+                         data-step-id="{{ diagnosticStep.id }}" 
+                         data-goto="{{ diagnosticStep.goto }}" 
+                         data-has-next="{{ diagnosticStep.nextStep ? 'true' : 'false' }}"
+                         data-has-next-ko="{{ diagnosticStep.nextStepKo ? 'true' : 'false' }}"
+                         data-type="{{ diagnosticStep.type }}">
+                        <div class="step-header d-flex justify-content-between align-items-center p-3 rounded-top" 
+                             style="background-color: {% if diagnosticStep.type == 'symptome' %}#4e73df{% elseif diagnosticStep.type == 'check' %}#f6c23e{% else %}#1cc88a{% endif %}; color: white;">
+                            <h3 class="h5 mb-0">{{ diagnosticStep.description }}</h3>
+                            <span class="step-type-badge">{{ diagnosticStep.type|capitalize }}</span>
+                        </div>
+                        <div class="step-content p-3 bg-white rounded-bottom border">
+                            <div class="step-details">
+                                {% if diagnosticStep.type == 'check' %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="check_{{ diagnosticStep.id }}">
+                                        <label class="form-check-label" for="check_{{ diagnosticStep.id }}">
+                                            Vérifié
+                                        </label>
+                                    </div>
+                                {% elseif diagnosticStep.type == 'action' %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="action_{{ diagnosticStep.id }}">
+                                        <label class="form-check-label" for="action_{{ diagnosticStep.id }}">
+                                            Effectué
+                                        </label>
+                                    </div>
+                                {% endif %}
+                                
+                                {% if diagnosticStep.needDoc %}
+                                    <div class="mt-2">
+                                        <span class="badge bg-info">Documentation requise</span>
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
-                    {% endfor %}
-                </div>
+                    </div>
+                {% endfor %}
             </div>
         </div>
-
-        {# Section Vérifications #}
-        <div class="card mb-4">
-            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#verifications">
-                <h2 class="h5 mb-0">Vérifications</h2>
-                <i class="fas fa-chevron-down"></i>
-            </div>
-            <div class="collapse" id="verifications">
-                <div class="card-body">
-                    {% for step in steps.check %}
-                        <div class="step-item mb-3">
-                            <div class="step-content">
-                                <h3 class="h6">{{ step.description }}</h3>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="check_{{ step.id }}">
-                                    <label class="form-check-label" for="check_{{ step.id }}">
-                                        Vérifié
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        {# Section Actions #}
-        <div class="card mb-4">
-            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#actions">
-                <h2 class="h5 mb-0">Actions</h2>
-                <i class="fas fa-chevron-down"></i>
-            </div>
-            <div class="collapse" id="actions">
-                <div class="card-body">
-                    {% for step in steps.action %}
-                        <div class="step-item mb-3">
-                            <div class="step-content">
-                                <h3 class="h6">{{ step.description }}</h3>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="action_{{ step.id }}">
-                                    <label class="form-check-label" for="action_{{ step.id }}">
-                                        Effectué
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    {% endfor %}
+        
+        <div class="col-md-8">
+            <h2 class="mb-3">Arbre de diagnostic</h2>
+            <div id="diagnosticTree" class="diagnostic-tree">
+                <div class="alert alert-info initial-message">
+                    Cliquez sur un symptôme pour afficher son arbre de diagnostic.
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block javascripts %}
+{{ parent() }}
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser Mermaid (peut rester si d'autres diagrammes sont utilisés)
+    mermaid.initialize({
+        startOnLoad: false, // Important: Ne pas démarrer au chargement
+        theme: 'default',
+        flowchart: {
+            useMaxWidth: true,
+            htmlLabels: true,
+            curve: 'basis'
+        }
+    });
+
     // Gestion des étapes suivantes
     const checkboxes = document.querySelectorAll('.form-check-input');
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             if (this.checked) {
-                // Trouver la prochaine étape
-                const currentStep = this.closest('.step-item');
-                const nextStep = currentStep.nextElementSibling;
-                if (nextStep) {
-                    // Dérouler la section si nécessaire
-                    const section = nextStep.closest('.collapse');
-                    if (section && !section.classList.contains('show')) {
-                        const bsCollapse = new bootstrap.Collapse(section);
-                        bsCollapse.show();
+                // Trouver l'étape actuelle
+                const currentStep = this.closest('.step-block');
+                const gotoId = currentStep.dataset.goto;
+                const hasNext = currentStep.dataset.hasNext === 'true';
+                
+                if (gotoId === "0" && !hasNext) {
+                    // Rediriger vers la page d'accueil
+                    window.location.href = "{{ path('app_home') }}";
+                } else if (gotoId) {
+                    // Trouver l'étape cible par son ID
+                    const targetStep = document.querySelector(`.step-block[data-step-id="${gotoId}"]`);
+                    if (targetStep) {
+                        // Faire défiler jusqu'à l'étape cible
+                        targetStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // Mettre en évidence l'étape cible
+                        targetStep.classList.add('highlight');
+                        setTimeout(() => {
+                            targetStep.classList.remove('highlight');
+                        }, 2000);
+                    }
+                } else {
+                    // Si pas de goto, passer à l'étape suivante
+                    const nextStep = currentStep.nextElementSibling;
+                    if (nextStep) {
+                        nextStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 }
             }
         });
     });
+
+    // Gestion des clics sur les blocs
+    const stepBlocks = document.querySelectorAll('.step-block');
+    stepBlocks.forEach(block => {
+        block.addEventListener('click', function(e) {
+            if (e.target.type === 'checkbox' || e.target.tagName === 'LABEL') {
+                return;
+            }
+            
+            const stepId = this.dataset.stepId;
+            const stepType = this.dataset.type;
+            // On récupère hasNext / hasNextKo pour la logique de redirection potentielle
+            const hasNext = this.dataset.hasNext === 'true'; 
+            const hasNextKo = this.dataset.hasNextKo === 'true';
+            
+            // Si c'est un symptôme, on affiche l'arbre (le hasNext/hasNextKo n'est plus nécessaire ici pour déclencher)
+            if (stepType === 'symptome') { 
+                showDiagnosticTree(stepId); 
+                stepBlocks.forEach(b => b.classList.remove('active-step'));
+                this.classList.add('active-step');
+            } else {
+                 // Garder la logique de redirection si goto=0 et pas de next step
+                 const gotoId = this.dataset.goto;
+                 const currentHasNext = this.dataset.hasNext === 'true'; // Vérifier hasNext sur le bloc cliqué
+                 if (gotoId === "0" && !currentHasNext) {
+                     window.location.href = "{{ path('app_home') }}";
+                 }
+            }
+        });
+        
+        block.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+            this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+        });
+        
+        block.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = 'none';
+        });
+    });
+    
+
+    // Fonction pour afficher l'arbre de diagnostic (simplifiée)
+    function showDiagnosticTree(stepId) {
+        const treeContainer = document.getElementById('diagnosticTree');
+        // Afficher un indicateur de chargement
+        treeContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+        // Récupérer le code Mermaid via AJAX
+        fetch(`{{ path('app_diagnostic_tree') }}?stepId=${stepId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                if (data.mermaidCode) {
+                    // Vider le conteneur
+                    treeContainer.innerHTML = ''; 
+                    // Créer l'élément Mermaid
+                    const mermaidDiv = document.createElement('div');
+                    mermaidDiv.className = 'mermaid';
+                    treeContainer.appendChild(mermaidDiv);
+                    // Injecter le code et rendre
+                    mermaidDiv.textContent = data.mermaidCode;
+                    mermaid.run({ nodes: [mermaidDiv] }); // Utiliser mermaid.run pour rendre dynamiquement
+                } else {
+                    treeContainer.innerHTML = '<div class="alert alert-warning">Aucun arbre de diagnostic à afficher pour cette étape.</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors de la récupération ou du rendu de l\'arbre Mermaid:', error);
+                treeContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        Impossible de charger l'arbre de diagnostic. (${error.message})
+                    </div>
+                `;
+            });
+    }
+
+    // Supprimer les fonctions de génération JS devenues inutiles
+    // function collectTreeData(...) { ... }
+    // function generateMermaidFromCollectedDataRevised(...) { ... }
+
 });
 </script>
 {% endblock %}
 
 {% block stylesheets %}
+{{ parent() }}
 <style>
-.step-item {
-    padding: 10px;
-    border-radius: 5px;
-    background-color: #f8f9fa;
+.container-fluid {
+    padding: 0 30px;
+}
+
+.step-block {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.step-block.active-step {
+    box-shadow: 0 0 0 3px #4e73df;
+}
+
+.step-header {
+    transition: all 0.3s ease;
+}
+
+.step-type-badge {
+    background-color: rgba(255, 255, 255, 0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
 }
 
 .step-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    transition: all 0.3s ease;
 }
 
-.card-header {
-    cursor: pointer;
+.form-check-input:checked + .form-check-label {
+    text-decoration: line-through;
+    color: #6c757d;
 }
 
-.card-header i {
-    transition: transform 0.3s;
+/* Couleurs spécifiques pour chaque type */
+.step-block[data-type="symptome"] .step-header {
+    background-color: #4e73df;
 }
 
-.card-header[aria-expanded="true"] i {
-    transform: rotate(180deg);
+.step-block[data-type="check"] .step-header {
+    background-color: #f6c23e;
+}
+
+.step-block[data-type="action"] .step-header {
+    background-color: #1cc88a;
+}
+
+/* Animation de mise en évidence */
+@keyframes highlight {
+    0% { box-shadow: 0 0 0 0 rgba(78, 115, 223, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(78, 115, 223, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(78, 115, 223, 0); }
+}
+
+.highlight {
+    animation: highlight 2s;
+}
+
+/* Styles pour l'arbre de diagnostic */
+.diagnostic-tree {
+    position: relative;
+    min-height: 600px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    padding: 20px;
+    overflow: auto;
+}
+
+.initial-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: auto;
+    white-space: nowrap;
+}
+
+/* Styles Mermaid - Can be simplified as styles are now in classDef */
+.mermaid {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+/* Keep general node text styling */
+.mermaid .node text {
+    fill: #333; /* Default text color, overridden by classDef where needed */
+    stroke: none;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    /* dominant-baseline: central; */ /* Maybe adjust vertical alignment if needed */
+    /* text-anchor: middle; */ /* Center text */
+}
+
+/* Keep edge styling */
+.mermaid .edgeLabel {
+    background-color: white;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.mermaid .edgeLabel.OK {
+    color: #1cc88a;
+    border: 1px solid #1cc88a;
+}
+
+.mermaid .edgeLabel.KO {
+    color: #e74a3b;
+    border: 1px solid #e74a3b;
+}
+
+.mermaid .edgePaths path {
+    stroke-width: 1.5px;
+}
+
+/* Remove specific node type styles from CSS as they are now in classDef */
+/* 
+.mermaid .node.symptome rect { ... } 
+.mermaid .node.symptome text { ... }
+.mermaid .node.check polygon { ... }
+.mermaid .node.check text { ... }
+.mermaid .node.action rect { ... }
+.mermaid .node.action text { ... } 
+*/
+
+/* Styles responsifs */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 0 15px;
+    }
 }
 </style>
-{% endblock %}
 {% endblock %} 
